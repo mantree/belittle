@@ -135,7 +135,7 @@
           :actual called})))))
 
 (defn replace-fn-symbols-with-vars
-  "Replaces first symbols with vars in map literals"
+  "Replaces first symbols with vars for keys in map literals"
   [element]
   (if (list? element)
     (map replace-fn-symbols-with-vars element)
@@ -149,14 +149,7 @@
        element)
       element)))
 
-(defn collapse-bk
-  [raw]
-  (if (map? raw)
-     raw
-     (eval (map quote-map-keys raw))))
-
 (def group-by-fn (partial group-by (fn [[k v]] (first k))))
-(def mapcat-v (comp vec mapcat))
 
 (defn alter-all-var-routes
   [var->bindings]
