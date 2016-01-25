@@ -5,6 +5,16 @@
                                  map-keys
                                  map-vals]]))
 
+(defmacro is->
+  [target & predicates]
+  (let [t (gensym)]
+    `(let [~t ~target]
+       ~@(map
+          (fn [p]
+            `(ct/is
+              (~p ~t) (str '(~p ~target))))
+          predicates))))
+
 (defn arg-matcher
   [mocked called]
   (every? true?
@@ -15,6 +25,13 @@
                 (partial = m-arg)) c-arg))
            mocked
            called)))
+
+(defn fail
+  [msg]
+  (with-meta
+    {:state :fail}
+    {:harmony/state :fail
+     :harmony/fail-meta {:msg msg}}))
 
 (def anything
   (constantly true))
@@ -43,14 +60,21 @@
     (if (<= 0 (swap! counter-atom dec))
       response
       (ct/do-report {:type :fail        ;maybe have :fail-mock?
+                     :expected inital-count
+                     :actual (+ inital-count (- @counter-atom))
+                     :message "Mock over called. Which one though?"
                      :mock-data {:expected inital-count
                                  :actual (inc inital-count)
                                  :call-data @call-data
                                  :type :over-called}})))
   (complete [this]
+    (prn @counter-atom)
     (ct/do-report
-     {:type (if (= 0 @counter-atom)
+     {:type (if (>= 0 @counter-atom) ;if > 0 then over called will have been reported
               :pass :fail)
+      :expected inital-count
+      :actual (- inital-count @counter-atom)
+      :message "Mock under called. Duh, which one would be helpful!"
       :mock-data {:expected inital-count
                   :actual (- inital-count @counter-atom)
                   :call-data @call-data
@@ -125,7 +149,8 @@
 
 (defmacro given
   [redefs-raw & body]
-  (let [redefs-quoted (quote-map-keys redefs-raw)]
+  (let [redefs-quoted (quote-map-keys redefs-raw)
+        var-calls->mock (gensym)]
     `(let [redef-cmds# ~redefs-quoted
            ;push these larger blocks out into functions, to aid debugging if nothing else!
            redef-vared# (map-keys
@@ -136,16 +161,17 @@
                                            (resolve fn-p#))]
                              (cons fn-var# (rest fn-call#))))
                          redef-cmds#)
-           var-calls->mock# (map-vals mock redef-vared#)
+           ~var-calls->mock (map-vals mock redef-vared#)
            previous-var-vals# (doall (map
                                       (fn [fn-call#]
                                             (let [fn-var# (first fn-call#)]
                                               [fn-var# (var-get fn-var#)]))
-                                      (keys var-calls->mock#)))
-           grouped-mocks# (map-vals wrap-arg-matcher (group-by-fn var-calls->mock#))]
+                                      (keys ~var-calls->mock)))
+           grouped-mocks# (map-vals wrap-arg-matcher (group-by-fn ~var-calls->mock))]
        (try
          (alter-all-var-routes grouped-mocks#)
-         ;construct a seq combining checker and mock report maps.
          ~@body
+         (doseq [mm# (vals ~var-calls->mock)]
+           (complete mm#))
          (finally
            (alter-all-var-routes previous-var-vals#))))))
