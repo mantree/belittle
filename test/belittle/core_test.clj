@@ -2,6 +2,13 @@
   (:require [clojure.test :refer :all]
             [belittle.core :refer :all]))
 
-(deftest a-test
-  (testing "FIXME, I fail."
-    (is (= 0 1))))
+(def incer inc)
+
+(deftest basic-test
+  (testing "A basic mock"
+    (given
+     {(incer 0) (never)}
+     (is
+      (= (incer 0) 2)))))
+
+(basic-test)

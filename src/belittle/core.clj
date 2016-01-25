@@ -1,7 +1,9 @@
 (ns belittle.core
   (:require [clojure.test :as ct]
             [slingshot.slingshot :refer [throw+]]
-            [medley.core :refer [find-first]]))
+            [medley.core :refer [find-first
+                                 map-keys
+                                 map-vals]]))
 
 (defn arg-matcher
   [mocked called]
