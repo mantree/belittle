@@ -40,46 +40,42 @@
   []
   (.getStackTrace (Thread/currentThread)))
 
+;Having to pass var's into both fns, solely for reporting :(
 (defprotocol Mock
-  (respond [this query-args])
-  (complete [this]))
+  (respond [this query-args bnd-var])
+  (complete [this v]))
 
 (deftype AnyTimesConsistentMock
     [response]
   Mock
-  (respond [this called]
+  (respond [this called v]
     response)
-  (complete [this]
-    {:type :pass}))
+  (complete [this v]
+    (ct/do-report
+     {:type :pass})))
 
 (deftype ExactTimesConsistentMock
     [response inital-count counter-atom call-data]
   Mock
-  (respond [this called]
+  (respond [this called v]
     (swap! call-data conj [(get-stack-trace)])
     (if (<= 0 (swap! counter-atom dec))
       response
-      (ct/do-report {:type :fail        ;maybe have :fail-mock?
-                     :expected inital-count
-                     :actual (+ inital-count (- @counter-atom))
-                     :message "Mock over called. Which one though?"
-                     :mock-data {:expected inital-count
-                                 :actual (inc inital-count)
-                                 :call-data @call-data
-                                 :type :over-called}})))
-  (complete [this]
-    (prn @counter-atom)
-    (ct/do-report
-     {:type (if (>= 0 @counter-atom) ;if > 0 then over called will have been reported
-              :pass :fail)
-      :expected inital-count
-      :actual (- inital-count @counter-atom)
-      :message "Mock under called. Duh, which one would be helpful!"
-      :mock-data {:expected inital-count
-                  :actual (- inital-count @counter-atom)
-                  :call-data @call-data
-                  :type (if (= 0 @counter-atom)
-                          :complete :under-called)}})))
+      (ct/do-report
+       {:type :fail
+        :expected inital-count
+        :actual (+ inital-count (- @counter-atom))
+        :message (str "Mock over called for " v)})))
+  (complete [this v]
+    (if (zero? @counter-atom)
+      (ct/do-report
+       {:type :pass})
+      (when (pos? @counter-atom)
+        (ct/do-report
+         {:type :fail
+          :expected inital-count
+          :actual (- inital-count @counter-atom)
+          :message (str "Mock under called for " v)})))))
 
 (defn never []
   (ExactTimesConsistentMock. nil
@@ -107,30 +103,31 @@
 (defn wrap-arg-matcher
   [calls]
   (let [args-mocks (map #(vector ((comp rest first) %)
-                                 (mock (second %))) calls)]
+                                 (second %)) calls)]
     (fn [& called]
       (if-let [arg-mock (find-first
                          #(arg-matcher (first %) called)
                          args-mocks)]
-        (respond (second arg-mock) called)
+        (respond (second arg-mock) called (first (ffirst calls)))
         (ct/do-report
          {:type :fail
-          :expected args-mocks
-          :actual called
-          :mock-data {:type :bad-args}})))))
+          :message (str "Unregonised arguments to mock of " (first (ffirst calls)))
+          :expected (map first args-mocks)
+          :actual called})))))
 
-(defn quote-map-keys
+(defn replace-fn-symbols-with-vars
+  "Replaces first symbols with vars in map literals"
   [element]
   (if (list? element)
-    (map quote-map-keys element)
+    (map replace-fn-symbols-with-vars element)
     (if (map? element)
-      (zipmap (map (fn [[h & t]]
-                     (let [v (cond
-                               (var? h) h
-                               (symbol? h) (resolve h))]
-                       (cons 'list (cons v t))))
-                   (keys element))
-              (vals element))
+      (map-keys
+       (fn [[h & t]]
+         (let [v (cond
+                   (var? h) h
+                   (symbol? h) (resolve h))]
+           (cons 'list (cons v t))))
+       element)
       element)))
 
 (defn collapse-bk
@@ -149,29 +146,20 @@
 
 (defmacro given
   [redefs-raw & body]
-  (let [redefs-quoted (quote-map-keys redefs-raw)
-        var-calls->mock (gensym)]
+  (let [redefs-quoted (replace-fn-symbols-with-vars redefs-raw)]
     `(let [redef-cmds# ~redefs-quoted
-           ;push these larger blocks out into functions, to aid debugging if nothing else!
-           redef-vared# (map-keys
-                         (fn [fn-call#]
-                           (let [fn-p# (first fn-call#)
-                                 fn-var# (if (var? fn-p#)
-                                           fn-p#
-                                           (resolve fn-p#))]
-                             (cons fn-var# (rest fn-call#))))
-                         redef-cmds#)
-           ~var-calls->mock (map-vals mock redef-vared#)
+           var-calls->mock# (map-vals mock redef-cmds#)
            previous-var-vals# (doall (map
                                       (fn [fn-call#]
                                             (let [fn-var# (first fn-call#)]
                                               [fn-var# (var-get fn-var#)]))
-                                      (keys ~var-calls->mock)))
-           grouped-mocks# (map-vals wrap-arg-matcher (group-by-fn ~var-calls->mock))]
+                                      (keys var-calls->mock#)))
+           grouped-mocks# (map-vals wrap-arg-matcher
+                                    (group-by-fn var-calls->mock#))]
        (try
          (alter-all-var-routes grouped-mocks#)
          ~@body
-         (doseq [mm# (vals ~var-calls->mock)]
-           (complete mm#))
+         (doseq [call-mock# var-calls->mock#]
+           (complete (second call-mock#) (ffirst call-mock#)))
          (finally
            (alter-all-var-routes previous-var-vals#))))))

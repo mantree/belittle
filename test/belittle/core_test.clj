@@ -18,16 +18,6 @@
      {(incer 0) 2}
      (is
       (= (incer 0) 2))))
-  (testing "Call limits report error"
-    (given
-     {(incer 0) (once 2)}
-     (is
-      (= (incer 0) 2))
-     (is
-      (= (incer 0) nil))))
-  (testing "Completion checked"
-    (given
-     {(incer 0) (once 2)}))
   (testing "Merge multiple maps"
     (given (merge {(incer 0) 2}
                   {(decer 0) 1})
@@ -51,6 +41,25 @@
                   1)))))
 
 (mock-tests)
+
+(deftest should-fails
+  (testing "Completion checked"
+    (given
+     {(incer 0) (once 2)}))
+  (testing "Call limits report error"
+    (given
+     {(incer 0) (once 2)}
+     (is
+      (= (incer 0) 2))
+     (is
+      (= (incer 0) nil))))
+  (testing "Mock fails with unrecognised args. Mock returns nil for unrecognised"
+    (given
+     {(incer 0) 2}
+     (is
+      (= (incer 1) nil)))))
+
+(should-fails)
 
 (deftest mock-other-namespace-fn
   (testing "Unmocked"
