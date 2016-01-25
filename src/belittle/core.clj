@@ -36,6 +36,19 @@
 (def anything
   (constantly true))
 
+(defn file-and-line
+  "Copied from core.test"
+  [^Throwable exception depth]
+  (let [stacktrace (.getStackTrace exception)]
+    (if (< depth (count stacktrace))
+      (let [^StackTraceElement s (nth stacktrace depth)]
+        {:file (.getFileName s) :line (.getLineNumber s)})
+      {:file nil :line nil})))
+
+(defn get-file-and-line
+  []
+  (file-and-line (new Throwable) 2))
+
 (defn get-stack-trace
   []
   (.getStackTrace (Thread/currentThread)))
@@ -55,39 +68,45 @@
      {:type :pass})))
 
 (deftype ExactTimesConsistentMock
-    [response inital-count counter-atom call-data]
+    [response inital-count counter-atom call-data file-line]
   Mock
   (respond [this called v]
     (swap! call-data conj [(get-stack-trace)])
     (if (<= 0 (swap! counter-atom dec))
       response
       (ct/do-report
-       {:type :fail
-        :expected inital-count
-        :actual (+ inital-count (- @counter-atom))
-        :message (str "Mock over called for " v)})))
+       (merge
+        {:type :fail
+         :expected inital-count
+         :actual (+ inital-count (- @counter-atom))
+         :message (str "Mock over called for " v)}
+        file-line))))
   (complete [this v]
     (if (zero? @counter-atom)
       (ct/do-report
        {:type :pass})
       (when (pos? @counter-atom)
         (ct/do-report
-         {:type :fail
-          :expected inital-count
-          :actual (- inital-count @counter-atom)
-          :message (str "Mock under called for " v)})))))
+         (merge
+          {:type :fail
+           :expected inital-count
+           :actual (- inital-count @counter-atom)
+           :message (str "Mock under called for " v)}
+          file-line))))))
 
 (defn never []
   (ExactTimesConsistentMock. nil
                              0
                              (atom 0)
-                             (atom [])))
+                             (atom [])
+                             (get-file-and-line)))
 
 (defn once [response]
   (ExactTimesConsistentMock. response
                              1
                              (atom 1)
-                             (atom [])))
+                             (atom [])
+                             (get-file-and-line)))
 
 (defn mock
   [raw-resp]
