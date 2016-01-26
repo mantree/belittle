@@ -28,10 +28,10 @@
 
 (defn fail
   [msg]
-  (with-meta
-    {:state :fail}
-    {:harmony/state :fail
-     :harmony/fail-meta {:msg msg}}))
+  (ct/do-report
+   {:type :fail
+    :message msg})
+  false)
 
 (def anything
   (constantly true))

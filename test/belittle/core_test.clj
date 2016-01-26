@@ -99,7 +99,12 @@
     (= e a)))
 
 (deftest is-threading
-  (is-> 1
-        (equals 1)))
+  (testing "One"
+    (is-> 1
+          (equals 1)))
+  (testing "Two"
+    (is-> 1
+          (equals 1)
+          (equals 2))))
 
 (is-threading)
