@@ -72,27 +72,25 @@
   Mock
   (respond [this called v]
     (swap! call-data conj [(get-stack-trace)])
-    (if (<= 0 (swap! counter-atom dec))
-      response
-      (ct/do-report
-       (merge
-        {:type :fail
-         :expected inital-count
-         :actual (+ inital-count (- @counter-atom))
-         :message (str "Mock over called for " v)}
-        file-line))))
+    (when (<= 0 (swap! counter-atom dec))
+      response))
   (complete [this v]
-    (if (zero? @counter-atom)
-      (ct/do-report
-       {:type :pass})
-      (when (pos? @counter-atom)
-        (ct/do-report
-         (merge
-          {:type :fail
-           :expected inital-count
-           :actual (- inital-count @counter-atom)
-           :message (str "Mock under called for " v)}
-          file-line))))))
+    (ct/do-report
+     (let [c @counter-atom]
+       (cond
+         (zero? c) {:type :pass}
+         (pos? c) (merge
+                   {:type :fail
+                    :expected inital-count
+                    :actual (- inital-count @counter-atom)
+                    :message (str "Mock under called for " v)}
+                   file-line)
+         (neg? c) (merge
+                 {:type :fail
+                  :expected inital-count
+                  :actual (+ inital-count (- @counter-atom))
+                  :message (str "Mock over called for " v)}
+                 file-line))))))
 
 (defn never []
   (ExactTimesConsistentMock. nil
@@ -144,12 +142,13 @@
        (fn [[h & t]]
          (let [v (cond
                    (var? h) h
-                   (symbol? h) (resolve h))]
+                   (symbol? h) (resolve h))] ;NEED a nil check here! Var's must be resolved.
            (cons 'list (cons v t))))
        element)
       element)))
 
-(def group-by-fn (partial group-by (fn [[k v]] (first k))))
+(def group-by-fn
+  (partial group-by (fn [[k v]] (first k))))
 
 (defn alter-all-var-routes
   [var->bindings]
@@ -163,8 +162,8 @@
            var-calls->mock# (map-vals mock redef-cmds#)
            previous-var-vals# (doall (map
                                       (fn [fn-call#]
-                                            (let [fn-var# (first fn-call#)]
-                                              [fn-var# (var-get fn-var#)]))
+                                        (let [fn-var# (first fn-call#)]
+                                          [fn-var# (var-get fn-var#)]))
                                       (keys var-calls->mock#)))
            grouped-mocks# (map-vals wrap-arg-matcher
                                     (group-by-fn var-calls->mock#))]

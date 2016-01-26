@@ -38,7 +38,13 @@
            (is (= (incer 0)
                   2)
                (= (decer 0)
-                  1)))))
+                  1))))
+  (testing "Mocks evaluated within let context"
+    (let [x 0]
+      (given
+       {(incer x) 2}
+       (is
+        (= (incer 0) 2))))))
 
 (mock-tests)
 
