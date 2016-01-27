@@ -38,16 +38,14 @@
 
 (defn file-and-line
   "Copied from core.test"
-  [^Throwable exception depth]
-  (let [stacktrace (.getStackTrace exception)]
-    (if (< depth (count stacktrace))
-      (let [^StackTraceElement s (nth stacktrace depth)]
-        {:file (.getFileName s) :line (.getLineNumber s)})
-      {:file nil :line nil})))
-
-(defn get-file-and-line
-  []
-  (file-and-line (new Throwable) 2))
+  ([]
+   (file-and-line (new Throwable) 3))
+  ([^Throwable exception depth]
+   (let [stacktrace (.getStackTrace exception)]
+     (if (< depth (count stacktrace))
+       (let [^StackTraceElement s (nth stacktrace depth)]
+         {:file (.getFileName s) :line (.getLineNumber s)})
+       {:file nil :line nil}))))
 
 (defn get-stack-trace
   []
@@ -97,14 +95,14 @@
                              0
                              (atom 0)
                              (atom [])
-                             (get-file-and-line)))
+                             (file-and-line)))
 
 (defn once [response]
   (ExactTimesConsistentMock. response
                              1
                              (atom 1)
                              (atom [])
-                             (get-file-and-line)))
+                             (file-and-line)))
 
 (defn mock
   [raw-resp]
