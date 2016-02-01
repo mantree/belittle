@@ -130,20 +130,26 @@
           :expected (map first args-mocks)
           :actual called})))))
 
+(defn if-map-resolve-keys-as-vars
+  [m]
+  (if (map? m)
+    (map-keys
+     (fn [[h & t]]
+       (let [v (cond
+                 (var? h) h
+                 (symbol? h) (resolve h))] ;NEED a nil check here! Var's must be resolved.
+         (cons 'list (cons v t))))
+     m)
+    m))
+
 (defn replace-fn-symbols-with-vars
   "Replaces first symbols with vars for keys in map literals"
   [element]
   (if (list? element)
-    (map replace-fn-symbols-with-vars element)
-    (if (map? element)
-      (map-keys
-       (fn [[h & t]]
-         (let [v (cond
-                   (var? h) h
-                   (symbol? h) (resolve h))] ;NEED a nil check here! Var's must be resolved.
-           (cons 'list (cons v t))))
-       element)
-      element)))
+    (if (= 'merge (first element))
+      (map if-map-resolve-keys-as-vars element)
+      element)
+    (if-map-resolve-keys-as-vars element)))
 
 (def group-by-fn
   (partial group-by (fn [[k v]] (first k))))

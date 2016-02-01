@@ -6,8 +6,10 @@
 (def incer inc)
 
 (defn get-decer
-  [x y]
-  {(m decer x) y})
+  ([{:keys [x y]}]
+   (get-decer x y))
+  ([x y]
+   {(m decer x) y}))
 
 (def get-decer-0-1
   {(m decer 0) 1})
@@ -44,7 +46,13 @@
       (given
        {(incer x) 2}
        (is
-        (= (incer 0) 2))))))
+        (= (incer 0) 2)))))
+  (testing "Map literal keys to vars only occurs on top level maps"
+    (given
+     (get-decer
+      {:x 1 :y 2})
+     (is (= (decer 1)
+            2)))))
 
 (mock-tests)
 
