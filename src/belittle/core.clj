@@ -1,6 +1,5 @@
 (ns belittle.core
   (:require [clojure.test :as ct]
-            [slingshot.slingshot :refer [throw+]]
             [medley.core :refer [find-first
                                  map-keys
                                  map-vals]]))
@@ -17,14 +16,15 @@
 
 (defn arg-matcher
   [mocked called]
-  (every? true?
-          (map
-           (fn [m-arg c-arg]
-             ((if (fn? m-arg)
-                m-arg
-                (partial = m-arg)) c-arg))
-           mocked
-           called)))
+  (every?
+   true?
+   (map
+    (fn [m-arg c-arg]
+      ((if (fn? m-arg)
+         m-arg
+         (partial = m-arg)) c-arg))
+    mocked
+    called)))
 
 (defn fail
   [msg]
@@ -111,7 +111,7 @@
     (AnyTimesConsistentMock. raw-resp)))
 
 (defmacro m
-  "Cheeky macro to enable mock composition"
+  "Cheeky macro to aid mock returning fns"
   [f & args]
   `(list (var ~f) ~@args))
 
@@ -130,7 +130,7 @@
           :expected (map first args-mocks)
           :actual called})))))
 
-(defn if-map-resolve-keys-as-vars
+(defn resolve-map-keys-to-vars
   [m]
   (if (map? m)
     (map-keys
@@ -142,17 +142,13 @@
      m)
     m))
 
-(defn replace-fn-symbols-with-vars
-  "Replaces first symbols with vars for keys in map literals"
+(defn call-symbols-to-vars
   [element]
   (if (list? element)
     (if (= 'merge (first element))
-      (map if-map-resolve-keys-as-vars element)
+      (map resolve-map-keys-to-vars element)
       element)
-    (if-map-resolve-keys-as-vars element)))
-
-(def group-by-fn
-  (partial group-by (fn [[k v]] (first k))))
+    (resolve-map-keys-to-vars element)))
 
 (defn alter-all-var-routes
   [var->bindings]
@@ -161,20 +157,17 @@
 
 (defmacro given
   [redefs-raw & body]
-  (let [redefs-quoted (replace-fn-symbols-with-vars redefs-raw)]
-    `(let [redef-cmds# ~redefs-quoted
-           var-calls->mock# (map-vals mock redef-cmds#)
-           previous-var-vals# (doall (map
-                                      (fn [fn-call#]
-                                        (let [fn-var# (first fn-call#)]
-                                          [fn-var# (var-get fn-var#)]))
-                                      (keys var-calls->mock#)))
-           grouped-mocks# (map-vals wrap-arg-matcher
-                                    (group-by-fn var-calls->mock#))]
+  (let [redefs-vared (call-symbols-to-vars redefs-raw)]
+    `(let [redefs-evald# ~redefs-vared
+           redefs-mocks# (map-vals mock redefs-evald#)
+           previous-var-vals# (doall (for [call-var# (map ffirst redefs-mocks#)]
+                                       [call-var# (var-get call-var#)]))
+           var-grouped-mocks# (map-vals wrap-arg-matcher
+                                        (group-by ffirst redefs-mocks#))]
        (try
-         (alter-all-var-routes grouped-mocks#)
+         (alter-all-var-routes var-grouped-mocks#)
          ~@body
-         (doseq [call-mock# var-calls->mock#]
+         (doseq [call-mock# redefs-mocks#]
            (complete (second call-mock#) (ffirst call-mock#)))
          (finally
            (alter-all-var-routes previous-var-vals#))))))

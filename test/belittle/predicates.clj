@@ -14,6 +14,8 @@
 
 (deftest failing-just-tests
   (testing "just fails for different lengths"
-    (is (just [1 2] [1]))))
+    (is (just [1 2] [1])))
+  (testing "just fails for wrong order"
+    (is (just [1 2] [2 1]))))
 
 (failing-just-tests)

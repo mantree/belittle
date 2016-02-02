@@ -2,6 +2,16 @@
   (:require [clojure.test :as ct]
             [clojure.data :refer [diff]]))
 
+(defn report-
+  ([type msg a e]
+   (report- type msg a e nil))
+  ([type msg a e diffs]
+   (do-report (merge
+               {:type type :message msg
+                :expected e :actual a}
+               (when diffs
+                 {:diffs [[a (take 2 diffs)]]})))))
+
 (defn just-
   "Basic just. Not as sophisticated as Midje's"
   [msg act exp opts]
@@ -15,14 +25,9 @@
                     (every? true?
                             (for [i# e#]
                               (some #(= % i#) a#)))))
-         (do-report {:type :pass, :message ~msg,
-                     :expected e#, :actual a#})
-         (do-report {:type :fail, :message ~msg,
-                     :expected e#, :actual a#
-                     :diffs [[a# (take 2 (diff a# e#))]]}))
-       (do-report {:type :fail, :message "Count mismatch",
-                   :expected e#, :actual a#
-                   :diffs [[a# (take 2 (diff a# e#))]]}))))
+         (report- :pass ~msg a# e#)
+         (report- :fail ~msg a# e# (diff a# e#)))
+       (report- :fail ~msg a# e# (diff a# e#)))))
 
 (defmethod ct/assert-expr 'just [msg [_ a e & opts]]
   (just- msg a e opts))
