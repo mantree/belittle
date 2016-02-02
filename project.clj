@@ -1,8 +1,8 @@
 (defproject belittle "0.1.0-SNAPSHOT"
-  :description "FIXME: write description"
-  :url "http://example.com/FIXME"
-  :license {:name "Eclipse Public License"
-            :url "http://www.eclipse.org/legal/epl-v10.html"}
+  :description "Bringing Mocking to core.test since 2016"
+  :url "https://github.com/mixradio/belittle"
+  :license {:name "New BSD License"
+            :url "https://github.com/mixradio/belittle/blob/master/LICENSE"}
   :dependencies [[org.clojure/clojure "1.7.0"]
-                 [medley "0.7.0"]
-                 [slingshot "0.12.2"]])
+                 [medley "0.7.0"]]
+  :profiles {:dev {:dependencies [[com.gfredericks/test.chuck "0.2.5"]]}})

@@ -20,6 +20,11 @@
      {(incer 0) 2}
      (is
       (= (incer 0) 2))))
+  (testing "Mocks accept predicates"
+    (given
+     {(incer anything) 2}
+     (is
+      (= (incer "foo") 2))))
   (testing "Merge multiple maps"
     (given (merge {(incer 0) 2}
                   {(decer 0) 1})
@@ -113,6 +118,6 @@
   (testing "Two"
     (is-> 1
           (equals 1)
-          (equals 2))))
+          (equals 1))))
 
 (is-threading)
