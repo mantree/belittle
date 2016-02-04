@@ -1,4 +1,4 @@
-(defproject belittle "0.1.0-SNAPSHOT"
+(defproject belittle "0.1.0"
   :description "Bringing Mocking to core.test since 2016"
   :url "https://github.com/mixradio/belittle"
   :license {:name "New BSD License"
