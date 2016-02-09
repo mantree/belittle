@@ -29,6 +29,8 @@
          (report- :fail ~msg a# e# (diff a# e#)))
        (report- :fail ~msg a# e# (diff a# e#)))))
 
+(def just)
+
 (defmethod ct/assert-expr 'just [msg [_ a e & opts]]
   (just- msg a e opts))
 
