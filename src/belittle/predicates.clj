@@ -6,7 +6,7 @@
   ([type msg a e]
    (report- type msg a e nil))
   ([type msg a e diffs]
-   (do-report (merge
+   (ct/do-report (merge
                {:type type :message msg
                 :expected e :actual a}
                (when diffs
