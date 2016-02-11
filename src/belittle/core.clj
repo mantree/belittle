@@ -96,7 +96,7 @@
 
 (defn wrap-returning
   [raw-resp]
-  (if (extends? Mock (type raw-resp))
+  (if (satisfies? Mock (type raw-resp))
     raw-resp
     (returning raw-resp)))
 
