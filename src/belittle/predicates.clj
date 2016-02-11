@@ -12,6 +12,8 @@
                (when diffs
                  {:diffs [[a (take 2 diffs)]]})))))
 
+(declare just)
+
 (defn just-
   "Basic just. Not as sophisticated as Midje's"
   [msg act exp opts]
@@ -28,8 +30,6 @@
          (report- :pass ~msg a# e#)
          (report- :fail ~msg a# e# (diff a# e#)))
        (report- :fail ~msg a# e# (diff a# e#)))))
-
-(def just)
 
 (defmethod ct/assert-expr 'just [msg [_ a e & opts]]
   (just- msg a e opts))

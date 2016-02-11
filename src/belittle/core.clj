@@ -39,7 +39,9 @@
 (defn file-and-line
   "Copied from core.test"
   ([]
-   (file-and-line (new Throwable) 3))
+   (file-and-line 3))
+  ([depth]
+   (file-and-line (new Throwable) depth))
   ([^Throwable exception depth]
    (let [stacktrace (.getStackTrace exception)]
      (if (< depth (count stacktrace))
@@ -56,59 +58,145 @@
   (respond [this query-args bnd-var])
   (complete [this v]))
 
-(deftype AnyTimesConsistentMock
+(deftype Returner
     [response]
   Mock
   (respond [this called v]
     response)
-  (complete [this v]
-    (ct/do-report
-     {:type :pass})))
+  (complete [this v]))
 
-(deftype ExactTimesConsistentMock
-    [response inital-count counter-atom call-data file-line]
+(deftype Thrower
+    [exception]
   Mock
   (respond [this called v]
-    (swap! call-data conj [(get-stack-trace)])
-    (when (<= 0 (swap! counter-atom dec))
-      response))
+    (throw exception))
+  (complete [this v]))
+
+(deftype Stream
+    [counter responders]
+  Mock
+  (respond [this called v]
+    (try
+      (let [r (nth responders @counter)]
+        (swap! counter inc)
+        (respond r called v))
+      (catch IndexOutOfBoundsException e
+        nil)))
+  (complete [this v]
+    (doseq [r (take @counter responders)]
+      (complete r v))))
+
+(defn returning
+  [response]
+  (Returner. response))
+
+(defn throwing
+  [e]
+  (Thrower. e))
+
+(defn wrap-returning
+  [raw-resp]
+  (if (extends? Mock (type raw-resp))
+    raw-resp
+    (returning raw-resp)))
+
+(defn stream
+  [responses]
+  (Stream. (atom 0)
+           (map wrap-returning responses)))
+
+(deftype TimesMock
+    [response inital-count counter-atom pred file-line]
+  Mock
+  (respond [this called v]
+    (swap! counter-atom inc)
+    (respond response called v))
   (complete [this v]
     (ct/do-report
      (let [c @counter-atom]
-       (cond
-         (zero? c) {:type :pass}
-         (pos? c) (merge
-                   {:type :fail
-                    :expected inital-count
-                    :actual (- inital-count @counter-atom)
-                    :message (str "Mock under called for " v)}
-                   file-line)
-         (neg? c) (merge
-                 {:type :fail
-                  :expected inital-count
-                  :actual (+ inital-count (- @counter-atom))
-                  :message (str "Mock over called for " v)}
-                 file-line))))))
+       (if (pred inital-count @counter-atom)
+         {:type :pass}
+         (merge {:type :fail
+                 :expected inital-count
+                 :actual @counter-atom
+                 :message (str "Mock for " v " failed with predicate " pred)}
+                file-line))))
+    (complete response v)))
+
+(deftype ReportCallers
+    [call-data sub-mock]
+  Mock
+  (respond [this called v]
+    (swap! call-data conj [(get-stack-trace)])
+    (respond sub-mock called v))
+  (complete [this v]
+    (doseq [c @call-data]
+      (ct/do-report
+       {:type :fail
+        :message c}))
+    (complete sub-mock v)))
+
+(defn report-callers
+  [wrapped]
+  (ReportCallers. (atom [])
+                  (wrap-returning wrapped)))
 
 (defn never []
-  (ExactTimesConsistentMock. nil
-                             0
-                             (atom 0)
-                             (atom [])
-                             (file-and-line)))
+  (TimesMock. (wrap-returning nil)
+              0
+              (atom 0)
+              =
+              (file-and-line)))
 
-(defn once [response]
-  (ExactTimesConsistentMock. response
-                             1
-                             (atom 1)
-                             (atom [])
-                             (file-and-line)))
+(defn times
+  [response num]
+  (TimesMock. (wrap-returning response)
+              num
+              (atom 0)
+              =
+              (file-and-line 3)))
+
+(defn any-times
+  [response]
+  (TimesMock. (wrap-returning response)
+              0
+              (atom 0)
+              (constantly true)
+              (file-and-line 2)))
+
+(defn once
+  [response]
+  (times (wrap-returning response) 1))
+
+(defn twice
+  [response]
+  (times (wrap-returning response) 2))
+
+(defn thrice
+  [response]
+  (times (wrap-returning response) 3))
+
+(defn at-least
+  [response times]
+  (TimesMock. (wrap-returning response)
+              times
+              (atom 0)
+              <=
+              (file-and-line)))
+
+(defn no-more-than
+  [response times]
+  (TimesMock. (wrap-returning response)
+              times
+              (atom 0)
+              >=
+              (file-and-line)))
 
 (defn mock
   [raw-resp]
   (if (extends? Mock (type raw-resp))
     raw-resp
-    (AnyTimesConsistentMock. raw-resp)))
+    (any-times raw-resp)))
 
 (defmacro m
   "Cheeky macro to aid mock returning fns"
@@ -125,10 +213,12 @@
                          args-mocks)]
         (respond (second arg-mock) called (first (ffirst calls)))
         (ct/do-report
-         {:type :fail
-          :message (str "Unregonised arguments to mock of " (first (ffirst calls)))
-          :expected (map first args-mocks)
-          :actual called})))))
+         (merge
+          {:type :fail
+           :message (str "Unregonised arguments to mock of " (first (ffirst calls)))
+           :expected (map first args-mocks)
+           :actual called}
+          (file-and-line 4)))))))
 
 (defn resolve-map-keys-to-vars
   [m]

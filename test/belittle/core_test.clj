@@ -71,6 +71,11 @@
      (is
       (= (incer 0) 2))
      (is
+      (= (incer 0) 2))))
+  (testing "Never complains if called"
+    (given
+     {(incer 0) (never)}
+     (is
       (= (incer 0) nil))))
   (testing "Mock fails with unrecognised args. Mock returns nil for unrecognised"
     (given
@@ -79,6 +84,34 @@
       (= (incer 1) nil)))))
 
 (should-fails)
+
+(deftest composability
+  (testing "Wordy mocking"
+    (given
+     {(incer 0) (returning 2)}
+     (is
+      (= (incer 0) 2))))
+  (testing "Wordier mocking"
+    (given
+     {(incer 0) (any-times (returning 2))}
+     (is
+      (= (incer 0) 2))))
+  (testing "Streams with repeat"
+    (given
+     {(incer 0) (thrice
+                 (stream
+                  (cons (throwing (new Exception))
+                        (repeat 2))))}
+     (is
+      (thrown? Exception (incer 0)))
+     (is
+      (= 2
+         (incer 0)))
+     (is
+      (= 2
+         (incer 0))))))
+
+(composability)
 
 (deftest mock-other-namespace-fn
   (testing "Unmocked"

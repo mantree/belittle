@@ -1,4 +1,4 @@
-(ns belittle.predicates
+(ns belittle.predicates-test
   (:require [belittle.predicates :refer :all]
             [clojure.test :refer :all]))
 
