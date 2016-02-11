@@ -165,7 +165,7 @@ Belittle aims to be simple to use for simple use cases, and able to help for com
 As this shows call counting is decomplected from what to return. So you can do stuff like:
 
 ``` clojure 
-(thrice (stream (cons (throwing (new Exception) (repeat 2))))
+(thrice (stream (cons (throwing (new Exception)) (repeat 2))))
 ```
 
 `stream` is a returning mock that works it's way through a collection of responses. The responses are laziness wrapped with `returning` if they are not already a mock, hence `2` can just be a plain symbol.
