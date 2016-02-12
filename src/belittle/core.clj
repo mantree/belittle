@@ -77,11 +77,12 @@
   Mock
   (respond [this called v]
     (try
-      (let [r (nth responders @counter)]
+      (when-let [r (try
+                     (nth responders @counter)
+                     (catch IndexOutOfBoundsException e
+                       nil))]
         (swap! counter inc)
-        (respond r called v))
-      (catch IndexOutOfBoundsException e
-        nil)))
+        (respond r called v))))
   (complete [this v]
     (doseq [r (take @counter responders)]
       (complete r v))))
@@ -96,7 +97,7 @@
 
 (defn wrap-returning
   [raw-resp]
-  (if (satisfies? Mock (type raw-resp))
+  (if (satisfies? Mock raw-resp)
     raw-resp
     (returning raw-resp)))
 
