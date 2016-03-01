@@ -173,7 +173,7 @@ As this shows call counting is decomplected from what to return. So you can do s
 
 ## License
 
-Copyright © 2016 MixRadio
+Copyright © 2016 Tom Coupland
 
-[belittle is released under the 3-clause license ("New BSD License" or "Modified BSD License")](https://github.com/mixradio/belittle/blob/master/LICENSE)
+Distributed under the Eclipse Public License either version 1.0 or (at your option) any later version.
 
